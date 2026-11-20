@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Layer 2: RDS Postgres for the Massachusetts House Investment Pipeline'
+
+Parameters:
+  DBUsername:
+    Type: String
+    Default: 'dbadmin'
+    Description: 'Master username for the PostgreSQL database'
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: 'Master password for the PostgreSQL database (min 8 chars)'
+  AllowedCidr:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: >-
+      CIDR allowed to reach Postgres on 5432. AWS Glue jobs run outside a VPC and use
+      AWS public IPs, so the default is open. Password-protected, but for anything beyond
+      a class project restrict this and move Glue into the VPC with a Glue connection.
+
+Resources:
+  RDSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow Postgres traffic for the MA house investment pipeline'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AllowedCidr
+
+  PostgresDBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBInstanceIdentifier: 'ma-house-investment-db'
+      Engine: postgres
+      EngineVersion: '16'
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20   # MA-only data is small
+      StorageType: gp3
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !GetAtt RDSSecurityGroup.GroupId
+      PubliclyAccessible: true
+      BackupRetentionPeriod: 1
+
+Outputs:
+  DatabaseEndpoint:
+    Value: !GetAtt PostgresDBInstance.Endpoint.Address
+    Export:
+      Name: MA-DatabaseEndpoint

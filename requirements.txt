@@ -1,0 +1,9 @@
+# Dashboard + local tooling (Glue jobs get their dependencies from AWS)
+streamlit>=1.35
+pandas>=2.0
+plotly>=5.20
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+boto3>=1.34
+requests>=2.31
+pytest>=8.0

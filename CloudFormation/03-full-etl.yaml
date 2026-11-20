@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'End-to-end ETL: clean MA data, parallel landing loads (Spark), landing-to-final load'
+
+Parameters:
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: 'Database password for the ETL jobs'
+  DBUsername:
+    Type: String
+    Default: 'dbadmin'
+
+Resources:
+  # --- STEP 1: CLEAN (filter to MA, interpolate gaps, create landing schema) ---
+  DataCleaningJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'ma-clean-and-interpolate'
+      Role: !ImportValue MA-GlueRoleArn
+      Command:
+        Name: pythonshell
+        PythonVersion: '3.9'
+        ScriptLocation: !Sub
+          - 's3://${Bucket}/scripts/data_clean.py'
+          - Bucket: !ImportValue MA-DataLakeBucket
+      MaxCapacity: 0.0625
+      DefaultArguments:
+        '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
+        '--DB_USER': !Ref DBUsername
+        '--DB_PASSWORD': !Ref DBPassword
+        '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
+        '--additional-python-modules': 'psycopg2-binary'
+
+  # --- STEP 2: PARALLEL SPARK JOBS (cleaned CSV -> landing tables) ---
+  HouseValueJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'ma-etl-house-value'
+      Role: !ImportValue MA-GlueRoleArn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub
+          - 's3://${Bucket}/scripts/etl_house_value.py'
+          - Bucket: !ImportValue MA-DataLakeBucket
+      DefaultArguments:
+        '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
+        '--DB_USER': !Ref DBUsername
+        '--DB_PASSWORD': !Ref DBPassword
+        '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
+      GlueVersion: '4.0'
+      WorkerType: 'G.1X'
+      NumberOfWorkers: 2
+
+  MonthlyPaymentJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'ma-etl-monthly-payment'
+      Role: !ImportValue MA-GlueRoleArn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub
+          - 's3://${Bucket}/scripts/etl_monthly_payment.py'
+          - Bucket: !ImportValue MA-DataLakeBucket
+      DefaultArguments:
+        '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
+        '--DB_USER': !Ref DBUsername
+        '--DB_PASSWORD': !Ref DBPassword
+        '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
+      GlueVersion: '4.0'
+      WorkerType: 'G.1X'
+      NumberOfWorkers: 2
+
+  RentalIncomeJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'ma-etl-rental-income'
+      Role: !ImportValue MA-GlueRoleArn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub
+          - 's3://${Bucket}/scripts/etl_rental_income.py'
+          - Bucket: !ImportValue MA-DataLakeBucket
+      DefaultArguments:
+        '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
+        '--DB_USER': !Ref DBUsername
+        '--DB_PASSWORD': !Ref DBPassword
+        '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
+      GlueVersion: '4.0'
+      WorkerType: 'G.1X'
+      NumberOfWorkers: 2
+
+  # --- STEP 3: LANDING -> FINAL (dimensional model in Postgres) ---
+  LndToFinalDataLoadJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: 'ma-lnd-to-final-data-load'
+      Role: !ImportValue MA-GlueRoleArn
+      Command:
+        Name: pythonshell
+        PythonVersion: '3.9'
+        ScriptLocation: !Sub
+          - 's3://${Bucket}/scripts/lnd_to_final_data_load.py'
+          - Bucket: !ImportValue MA-DataLakeBucket
+      MaxCapacity: 0.0625
+      Timeout: 15
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      DefaultArguments:
+        '--DB_HOST': !ImportValue MA-DatabaseEndpoint
+        '--DB_NAME': 'postgres'
+        '--DB_USER': !Ref DBUsername
+        '--DB_PWD': !Ref DBPassword
+        '--additional-python-modules': 'psycopg2-binary'
+
+  # --- ORCHESTRATOR ---
+  EndToEndPipelineStateMachine:
+    Type: 'AWS::StepFunctions::StateMachine'
+    Properties:
+      StateMachineName: 'ma-end-to-end-pipeline'
+      RoleArn: !ImportValue MA-StepFunctionsRoleArn
+      DefinitionString: !Sub |
+        {
+          "StartAt": "CleanAndInterpolate",
+          "States": {
+            "CleanAndInterpolate": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": { "JobName": "${DataCleaningJob}" },
+              "Retry": [ { "ErrorEquals": ["States.TaskFailed"], "MaxAttempts": 1, "IntervalSeconds": 30 } ],
+              "Next": "ParallelLandingLoad"
+            },
+            "ParallelLandingLoad": {
+              "Type": "Parallel",
+              "Next": "LandingToFinal",
+              "Branches": [
+                { "StartAt": "HouseValue", "States": { "HouseValue": { "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync", "Parameters": { "JobName": "${HouseValueJob}" }, "End": true } } },
+                { "StartAt": "MonthlyPayment", "States": { "MonthlyPayment": { "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync", "Parameters": { "JobName": "${MonthlyPaymentJob}" }, "End": true } } },
+                { "StartAt": "RentalIncome", "States": { "RentalIncome": { "Type": "Task", "Resource": "arn:aws:states:::glue:startJobRun.sync", "Parameters": { "JobName": "${RentalIncomeJob}" }, "End": true } } }
+              ]
+            },
+            "LandingToFinal": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": { "JobName": "${LndToFinalDataLoadJob}" },
+              "End": true
+            }
+          }
+        }
