@@ -4,6 +4,7 @@ Also creates the `landing` schema in Postgres so the Spark jobs can write to it.
 The pure function `clean_frame` has no AWS dependencies so it can be unit-tested locally.
 """
 import io
+import json
 import sys
 
 import pandas as pd
@@ -58,9 +59,11 @@ def main():
     import boto3
     from awsglue.utils import getResolvedOptions
 
-    args = getResolvedOptions(sys.argv, ["DB_ENDPOINT", "DB_USER", "DB_PASSWORD", "BUCKET_NAME"])
+    args = getResolvedOptions(sys.argv, ["DB_ENDPOINT", "SECRET_NAME", "BUCKET_NAME"])
     bucket = args["BUCKET_NAME"]
-    create_landing_schema(args["DB_ENDPOINT"], args["DB_USER"], args["DB_PASSWORD"])
+    sm = boto3.client("secretsmanager")
+    creds = json.loads(sm.get_secret_value(SecretId=args["SECRET_NAME"])["SecretString"])
+    create_landing_schema(args["DB_ENDPOINT"], creds["username"], creds["password"])
 
     s3 = boto3.client("s3")
     for state_col, raw_name, clean_name in FILES:

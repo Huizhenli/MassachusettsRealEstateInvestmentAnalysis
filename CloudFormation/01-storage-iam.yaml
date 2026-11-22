@@ -42,6 +42,19 @@ Resources:
                   - !GetAtt DataLakeBucket.Arn
                   - !Sub '${DataLakeBucket.Arn}/*'
 
+  # (Glue may read the DB secret created by stack 2)
+  GlueSecretAccess:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: ReadDbSecret
+      Roles: [!Ref GlueServiceRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 'secretsmanager:GetSecretValue'
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ma-house/db-*'
+
   # 3. IAM Role for AWS Step Functions (Orchestration)
   StepFunctionsRole:
     Type: 'AWS::IAM::Role'

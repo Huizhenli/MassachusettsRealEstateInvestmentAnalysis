@@ -10,6 +10,8 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 8
+    AllowedPattern: '[A-Za-z0-9_.!#%^*+=-]*'
+    ConstraintDescription: 'Letters, digits and _ . ! # % ^ * + = - only (keeps the secret JSON valid)'
     Description: 'Master password for the PostgreSQL database (min 8 chars)'
   AllowedCidr:
     Type: String
@@ -20,6 +22,13 @@ Parameters:
       a class project restrict this and move Glue into the VPC with a Glue connection.
 
 Resources:
+  # Credentials for Glue jobs (read at run time, never passed as job arguments)
+  DBSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: 'ma-house/db'
+      SecretString: !Sub '{"username":"${DBUsername}","password":"${DBPassword}"}'
+
   RDSSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -32,6 +41,7 @@ Resources:
 
   PostgresDBInstance:
     Type: 'AWS::RDS::DBInstance'
+    DeletionPolicy: Delete   # reproducible data; avoids leaving a billable snapshot on teardown
     Properties:
       DBInstanceIdentifier: 'ma-house-investment-db'
       Engine: postgres
@@ -51,3 +61,7 @@ Outputs:
     Value: !GetAtt PostgresDBInstance.Endpoint.Address
     Export:
       Name: MA-DatabaseEndpoint
+  DBSecretName:
+    Value: !Ref DBSecret
+    Export:
+      Name: MA-DBSecretName

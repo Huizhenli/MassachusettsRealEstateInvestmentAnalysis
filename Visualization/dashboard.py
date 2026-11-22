@@ -130,7 +130,7 @@ st.subheader("Latest snapshot")
 st.dataframe(snap.style.format({
     "House value ($)": "{:,.0f}", "Monthly rent ($)": "{:,.0f}", "Gross yield": "{:.1%}",
     "Price-to-rent": "{:.1f}", "Net cash flow ($/mo)": "{:,.0f}", "5-yr appreciation": "{:.1%}"}, na_rep="—"),
-    use_container_width=True, hide_index=True)
+    width="stretch", hide_index=True)
 
 st.divider()
 
@@ -149,7 +149,7 @@ def line(tab, data, col, title, ylabel, empty_msg, **kw):
         else:
             st.plotly_chart(px.line(d, x="metric_month", y=col, color=key, title=title,
                                     labels={col: ylabel, "metric_month": "Date", key: label}, **kw),
-                            use_container_width=True)
+                            width="stretch")
 
 
 line(t1, fdf, "avg_house_value", f"Average House Value ({tier} tier)", "House Value ($)", "No house value data.")
@@ -174,12 +174,12 @@ with a1:
             fig = px.line(both, x="metric_month", y="gross_yield", color=key, title="Gross Rental Yield",
                           labels={"gross_yield": "Gross yield", "metric_month": "Date", key: label})
             fig.update_layout(yaxis_tickformat=".1%")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         with c2:
             st.plotly_chart(px.line(both, x="metric_month", y="price_to_rent", color=key,
                                     title="Price-to-Rent Ratio (higher = renting is relatively cheaper)",
                                     labels={"price_to_rent": "Price / annual rent", "metric_month": "Date", key: label}),
-                            use_container_width=True)
+                            width="stretch")
 
 with a2:
     cash = fdf.dropna(subset=["rental_income", "monthly_payment"])
@@ -194,12 +194,12 @@ with a2:
                            var_name="Metric", value_name="Amount ($)")
         melted["Metric"] = melted["Metric"].map({"rental_income": "Rent income", "monthly_payment": "Mortgage payment"})
         st.plotly_chart(px.line(melted, x="metric_month", y="Amount ($)", color=key, line_dash="Metric",
-                                title="Rent vs. Mortgage Payment"), use_container_width=True)
+                                title="Rent vs. Mortgage Payment"), width="stretch")
         fig = px.line(cash, x="metric_month", y="cash_flow", color=key,
                       title="Estimated Monthly Net Cash Flow (Rent − Mortgage; excludes taxes, insurance, upkeep)",
                       labels={"cash_flow": "Net cash flow ($)", "metric_month": "Date", key: label})
         fig.add_hline(y=0, line_dash="dash", line_color="black", annotation_text="Break even")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 with a3:
     if zips.empty:
@@ -214,11 +214,11 @@ with a3:
             st.plotly_chart(px.bar(latest.sort_values("rental_income", ascending=False).head(30),
                                    x="zip_code", y="rental_income", color="city",
                                    labels={"rental_income": "Monthly rent ($)", "zip_code": "ZIP"},
-                                   title="Top 30 ZIP codes by rent"), use_container_width=True)
+                                   title="Top 30 ZIP codes by rent"), width="stretch")
             st.dataframe(latest.sort_values("rental_income", ascending=False)
                          [["zip_code", "city", "county_name", "metro_name", "rental_income"]],
-                         use_container_width=True, hide_index=True)
+                         width="stretch", hide_index=True)
 
 st.divider()
 with st.expander("📂 View raw combined data"):
-    st.dataframe(fdf.sort_values(["metric_month", key], ascending=[False, True]), use_container_width=True)
+    st.dataframe(fdf.sort_values(["metric_month", key], ascending=[False, True]), width="stretch")

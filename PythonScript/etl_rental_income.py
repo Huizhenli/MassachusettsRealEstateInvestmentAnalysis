@@ -1,5 +1,7 @@
 import sys
 import re
+import json
+import boto3
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
@@ -18,12 +20,15 @@ def short_metro(c):
     return when(c.isNull() | (trim(c) == ""), lit("Non-metro")).otherwise(name)
 
 
-args = getResolvedOptions(sys.argv, ["JOB_NAME", "DB_ENDPOINT", "DB_USER", "DB_PASSWORD", "BUCKET_NAME"])
+args = getResolvedOptions(sys.argv, ["JOB_NAME", "DB_ENDPOINT", "SECRET_NAME", "BUCKET_NAME"])
 sc = SparkContext()
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
+
+# DB credentials come from AWS Secrets Manager, not job arguments
+creds = json.loads(boto3.client("secretsmanager").get_secret_value(SecretId=args["SECRET_NAME"])["SecretString"])
 
 df_raw = spark.read.csv(f"s3://{args['BUCKET_NAME']}/cleaned/*zori*.csv", header=True, inferSchema=True)
 
@@ -49,7 +54,7 @@ for c in df.columns:
 (df.write.format("jdbc")
  .option("url", f"jdbc:postgresql://{args['DB_ENDPOINT']}:5432/postgres")
  .option("dbtable", "landing.lnd_rental_income")
- .option("user", args["DB_USER"]).option("password", args["DB_PASSWORD"])
+ .option("user", creds["username"]).option("password", creds["password"])
  .option("driver", "org.postgresql.Driver").mode("overwrite").save())
 
 job.commit()

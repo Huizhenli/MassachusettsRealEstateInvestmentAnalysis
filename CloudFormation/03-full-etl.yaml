@@ -1,15 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'End-to-end ETL: clean MA data, parallel landing loads (Spark), landing-to-final load'
 
-Parameters:
-  DBPassword:
-    Type: String
-    NoEcho: true
-    Description: 'Database password for the ETL jobs'
-  DBUsername:
-    Type: String
-    Default: 'dbadmin'
-
 Resources:
   # --- STEP 1: CLEAN (filter to MA, interpolate gaps, create landing schema) ---
   DataCleaningJob:
@@ -26,8 +17,7 @@ Resources:
       MaxCapacity: 1  # national CSVs (~100 MB each) do not fit in 1/16 DPU
       DefaultArguments:
         '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
-        '--DB_USER': !Ref DBUsername
-        '--DB_PASSWORD': !Ref DBPassword
+        '--SECRET_NAME': !ImportValue MA-DBSecretName
         '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
         '--additional-python-modules': 'psycopg2-binary'
 
@@ -44,8 +34,7 @@ Resources:
           - Bucket: !ImportValue MA-DataLakeBucket
       DefaultArguments:
         '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
-        '--DB_USER': !Ref DBUsername
-        '--DB_PASSWORD': !Ref DBPassword
+        '--SECRET_NAME': !ImportValue MA-DBSecretName
         '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
       GlueVersion: '4.0'
       WorkerType: 'G.1X'
@@ -63,8 +52,7 @@ Resources:
           - Bucket: !ImportValue MA-DataLakeBucket
       DefaultArguments:
         '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
-        '--DB_USER': !Ref DBUsername
-        '--DB_PASSWORD': !Ref DBPassword
+        '--SECRET_NAME': !ImportValue MA-DBSecretName
         '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
       GlueVersion: '4.0'
       WorkerType: 'G.1X'
@@ -82,8 +70,7 @@ Resources:
           - Bucket: !ImportValue MA-DataLakeBucket
       DefaultArguments:
         '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
-        '--DB_USER': !Ref DBUsername
-        '--DB_PASSWORD': !Ref DBPassword
+        '--SECRET_NAME': !ImportValue MA-DBSecretName
         '--BUCKET_NAME': !ImportValue MA-DataLakeBucket
       GlueVersion: '4.0'
       WorkerType: 'G.1X'
@@ -108,8 +95,7 @@ Resources:
       DefaultArguments:
         '--DB_HOST': !ImportValue MA-DatabaseEndpoint
         '--DB_NAME': 'postgres'
-        '--DB_USER': !Ref DBUsername
-        '--DB_PWD': !Ref DBPassword
+        '--SECRET_NAME': !ImportValue MA-DBSecretName
         '--additional-python-modules': 'psycopg2-binary'
 
   # --- ORCHESTRATOR ---

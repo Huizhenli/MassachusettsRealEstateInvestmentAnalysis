@@ -170,18 +170,20 @@ def run_etl(conn_params):
 
 
 def main():
-    keys = ["DB_HOST", "DB_NAME", "DB_USER", "DB_PWD"]
-    try:  # inside AWS Glue
+    try:  # inside AWS Glue: credentials from Secrets Manager
         from awsglue.utils import getResolvedOptions
-        args = getResolvedOptions(sys.argv, keys)
-    except ImportError:  # local run: python lnd_to_final_data_load.py --DB_HOST ... 
+        import boto3, json
+        args = getResolvedOptions(sys.argv, ["DB_HOST", "DB_NAME", "SECRET_NAME"])
+        creds = json.loads(boto3.client("secretsmanager").get_secret_value(SecretId=args["SECRET_NAME"])["SecretString"])
+        user, pwd = creds["username"], creds["password"]
+    except ImportError:  # local run: python lnd_to_final_data_load.py --DB_HOST ... --DB_USER ... --DB_PWD ...
         import argparse
         p = argparse.ArgumentParser()
-        for k in keys:
+        for k in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PWD"]:
             p.add_argument(f"--{k}", required=True)
         args = vars(p.parse_args())
-    run_etl({"host": args["DB_HOST"], "database": args["DB_NAME"],
-             "user": args["DB_USER"], "password": args["DB_PWD"]})
+        user, pwd = args["DB_USER"], args["DB_PWD"]
+    run_etl({"host": args["DB_HOST"], "database": args["DB_NAME"], "user": user, "password": pwd})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the whole pipeline. Requires the AWS CLI configured for your account.
-#   DB_PASSWORD='...' ./scripts/deploy.sh
+#   DB_PASSWORD='...' ./scripts/deploy.sh   (letters, digits and _ . ! # % ^ * + = - only)
+# The password is stored in AWS Secrets Manager (ma-house/db); Glue jobs read it from there.
 set -euo pipefail
 : "${DB_PASSWORD:?Set DB_PASSWORD (min 8 chars)}"
 cd "$(dirname "$0")/.."
@@ -17,8 +18,7 @@ aws s3 cp PythonScript/ "s3://${BUCKET}/scripts/" --recursive --exclude "*" --in
 python scripts/download_zillow.py --out Data --bucket "$BUCKET"
 
 aws cloudformation deploy --stack-name ma-house-etl \
-  --template-file CloudFormation/03-full-etl.yaml \
-  --parameter-overrides DBPassword="$DB_PASSWORD"
+  --template-file CloudFormation/03-full-etl.yaml
 
 SFN=$(aws cloudformation describe-stack-resources --stack-name ma-house-etl \
   --query "StackResources[?ResourceType=='AWS::StepFunctions::StateMachine'].PhysicalResourceId" --output text)

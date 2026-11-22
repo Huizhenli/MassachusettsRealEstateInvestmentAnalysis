@@ -1,5 +1,5 @@
 # Dashboard + local tooling (Glue jobs get their dependencies from AWS)
-streamlit>=1.35
+streamlit>=1.50
 pandas>=2.0
 plotly>=5.20
 sqlalchemy>=2.0
