@@ -23,7 +23,7 @@ Resources:
         ScriptLocation: !Sub
           - 's3://${Bucket}/scripts/data_clean.py'
           - Bucket: !ImportValue MA-DataLakeBucket
-      MaxCapacity: 0.0625
+      MaxCapacity: 1  # national CSVs (~100 MB each) do not fit in 1/16 DPU
       DefaultArguments:
         '--DB_ENDPOINT': !ImportValue MA-DatabaseEndpoint
         '--DB_USER': !Ref DBUsername
