@@ -35,7 +35,8 @@ df_raw = spark.read.csv(f"s3://{args['BUCKET_NAME']}/cleaned/*zhvi*.csv", header
 
 id_cols = ["RegionID", "SizeRank", "RegionName", "RegionType", "StateName", "State", "Metro", "CountyName"]
 date_cols = [c for c in df_raw.columns if c not in id_cols]
-stack_expr = f"stack({len(date_cols)}, " + ", ".join([f"'{c}', `{c}`" for c in date_cols]) + ") as (date_str, house_value)"
+# cast every month to double: an all-empty month would otherwise be inferred as string and break stack()
+stack_expr = f"stack({len(date_cols)}, " + ", ".join([f"'{c}', CAST(`{c}` AS DOUBLE)" for c in date_cols]) + ") as (date_str, house_value)"
 
 df = (
     df_raw.select(*id_cols, input_file_name().alias("source_file"), expr(stack_expr))

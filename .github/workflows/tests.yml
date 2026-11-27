@@ -6,7 +6,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install pandas numpy pytest
-      - run: pytest -q tests
-      - run: python -m py_compile PythonScript/*.py Visualization/dashboard.py scripts/download_zillow.py
+        with: { python-version: "3.11" }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - run: pip install pandas numpy pytest "pyspark==3.5.3"
+      - run: pytest -q tests          # unit test + the three Spark jobs run locally
+      - run: python -m py_compile PythonScript/*.py Visualization/dashboard.py scripts/*.py

@@ -1,24 +1,45 @@
 # pip install streamlit pandas sqlalchemy psycopg2-binary plotly
 # run with:  streamlit run dashboard.py
 
+import pathlib
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
 ALL_COUNTIES = "All counties"
 
 st.set_page_config(page_title="MA Real Estate Investment Analysis", layout="wide", page_icon="📈")
 
 
+DEMO_DIR = pathlib.Path(__file__).resolve().parent.parent / "data" / "demo"
+
+
+def _has_db_secrets() -> bool:
+    try:
+        return "postgres" in st.secrets
+    except Exception:  # no secrets.toml at all
+        return False
+
+
 @st.cache_resource
 def get_db_engine():
-    creds = st.secrets["postgres"]  # .streamlit/secrets.toml
-    url = f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
-    return create_engine(url)
+    """Live PostgreSQL (RDS) when secrets are configured; otherwise an in-memory SQLite
+    loaded from the committed snapshot in data/demo, so the app runs with no database."""
+    if _has_db_secrets():
+        creds = st.secrets["postgres"]  # .streamlit/secrets.toml
+        url = f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['database']}"
+        return create_engine(url)
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    for f in sorted(DEMO_DIR.glob("*.csv.gz")):
+        pd.read_csv(f, dtype={"zip_code": str}).to_sql(f.name.removesuffix(".csv.gz"), engine, index=False)
+    return engine
 
 
 engine = get_db_engine()
+DEMO_MODE = not _has_db_secrets()
 
 
 @st.cache_data(ttl=3600)
@@ -90,9 +111,13 @@ with st.sidebar.expander("ℹ️ Data notes"):
         "- Metro and county values are simple averages of the city (ZHVI) or ZIP (ZORI) series inside them.\n"
         "- Metro names are shortened (e.g. *Boston-Cambridge-Newton, MA-NH* → Boston) and "
         "include only Zillow's regions in the metro; Zillow data may be missing for some places.\n"
-        "- Mortgage payments are published for metros only.")
+        "- Mortgage payments are published for metros only.\n"
+        "- County figures can be noisy where Zillow covers only a few ZIPs (e.g. Franklin County).")
 
 st.title("🏠 Massachusetts Real Estate Market & Investment Analytics")
+if DEMO_MODE:
+    st.caption("Demo mode: showing a bundled data snapshot (Zillow Research, through Oct 2026). "
+               "Configure `[postgres]` secrets to read live from the PostgreSQL warehouse.")
 if fdf.empty:
     st.warning(f"Please select at least one {label.lower()} from the sidebar.")
     st.stop()

@@ -1,4 +1,4 @@
-Data/
+/Data/
 .venv/
 __pycache__/
 *.pyc
@@ -7,3 +7,6 @@ Visualization/.streamlit/secrets.toml
 .streamlit/secrets.toml
 credentials.txt
 *.env
+!data/
+!data/demo/
+!data/demo/*

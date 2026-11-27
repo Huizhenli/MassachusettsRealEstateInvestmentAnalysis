@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 520" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="980" height="520" fill="#fff"/>
+  <text x="490" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#222">Dimensional model (star schema)</text>
+  <g stroke="#555" stroke-width="1.5" fill="none">
+    <path d="M330 150 H400"/><path d="M570 150 H640"/><path d="M400 205 L300 300" />
+  </g>
+  <!-- dimension -->
+  <rect x="400" y="90" width="170" height="115" rx="8" fill="#e8f1fb" stroke="#2f6fb5" stroke-width="1.5"/>
+  <text x="485" y="112" text-anchor="middle" font-weight="bold">dim_geography</text>
+  <line x1="400" y1="120" x2="570" y2="120" stroke="#2f6fb5"/>
+  <text x="412" y="142">geo_key  (PK)</text><text x="412" y="162">metro_name</text><text x="412" y="182">county_name</text>
+  <text x="412" y="199" font-size="11" fill="#555">'All counties' = metro grain</text>
+  <!-- facts -->
+  <g fill="#eaf6ec" stroke="#2e8b57" stroke-width="1.5">
+    <rect x="130" y="70" width="200" height="140" rx="8"/><rect x="640" y="70" width="210" height="140" rx="8"/>
+    <rect x="130" y="300" width="200" height="120" rx="8"/><rect x="390" y="300" width="200" height="120" rx="8"/>
+  </g>
+  <g fill="#222">
+    <text x="230" y="92" text-anchor="middle" font-weight="bold">fact_house_value</text>
+    <text x="142" y="118">geo_key (FK)</text><text x="142" y="138">home_tier</text><text x="142" y="158">metric_date</text><text x="142" y="178">avg_house_value</text><text x="142" y="198">year</text>
+    <text x="745" y="92" text-anchor="middle" font-weight="bold">fact_rental_income</text>
+    <text x="652" y="118">geo_key (FK)</text><text x="652" y="138">metric_date</text><text x="652" y="158">rental_income</text><text x="652" y="178">year</text>
+    <text x="230" y="322" text-anchor="middle" font-weight="bold">fact_monthly_payment</text>
+    <text x="142" y="348">geo_key (FK, metro grain)</text><text x="142" y="368">metric_date</text><text x="142" y="388">monthly_payment</text><text x="142" y="408">year</text>
+    <text x="490" y="322" text-anchor="middle" font-weight="bold">fact_zip_rent</text>
+    <text x="402" y="348">zip_code, city</text><text x="402" y="368">county_name, metro_name</text><text x="402" y="388">metric_date, rental_income</text><text x="402" y="408">year</text>
+  </g>
+  <rect x="640" y="300" width="300" height="120" rx="8" fill="#fff4e0" stroke="#d98c00" stroke-width="1.5"/>
+  <text x="652" y="322" font-weight="bold" fill="#222">Grain and keys</text>
+  <g fill="#222" font-size="12">
+    <text x="652" y="346">house value: (geo_key, home_tier, month)</text>
+    <text x="652" y="364">rent / payment: (geo_key, month)</text>
+    <text x="652" y="382">zip rent: (zip_code, month)</text>
+    <text x="652" y="404" fill="#555">fact_zip_rent is denormalised; no FK</text>
+  </g>
+  <text x="490" y="470" text-anchor="middle" fill="#555">Staging: landing.lnd_house_value · lnd_monthly_payment · lnd_rental_income (overwritten each run)</text>
+  <text x="490" y="490" text-anchor="middle" fill="#555">All loads are idempotent upserts (ON CONFLICT DO UPDATE)</text>
+</svg>

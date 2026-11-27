@@ -56,9 +56,10 @@ PythonScript/     data_clean.py, etl_house_value.py, etl_monthly_payment.py,
                   etl_rental_income.py, lnd_to_final_data_load.py
 Visualization/    dashboard.py (+ .streamlit/secrets.toml.example)
 scripts/          download_zillow.py, deploy.sh, teardown.sh
-docs/             architecture.svg, dashboard.png
+docs/             REPORT.md/.docx, architecture + data-model diagrams, dashboard.png
 .github/workflows tests.yml (CI: pytest on every push)
-tests/            test_clean.py
+tests/            test_clean.py, test_spark_jobs.py
+data/demo/        snapshot of the final tables for demo mode
 ```
 
 ## Deploy
@@ -77,20 +78,33 @@ cp Visualization/.streamlit/secrets.toml.example Visualization/.streamlit/secret
 cd Visualization && streamlit run dashboard.py
 ```
 
-## Host the dashboard (optional)
-1. Push this repo to GitHub (done) and sign in at <https://share.streamlit.io> with GitHub.
-2. New app → this repo, branch `main`, main file `Visualization/dashboard.py`.
-3. In *Advanced settings → Secrets*, paste the `[postgres]` block from `secrets.toml.example` with your RDS details.
-4. The RDS instance must be reachable from the internet (the default security group is open; see caveats).
+## Try it without AWS (demo mode)
+With no `[postgres]` secrets the dashboard loads the bundled snapshot in `data/demo/` into an in-memory SQLite database and shows the same figures:
+```bash
+pip install -r Visualization/requirements.txt
+streamlit run Visualization/dashboard.py
+```
+Refresh the snapshot from a live database with `python scripts/build_demo_snapshot.py --dsn postgresql+psycopg2://user:pw@host:5432/postgres`.
+
+## Host the dashboard (free, no AWS needed)
+Because of demo mode, hosting needs no database:
+1. Sign in at <https://share.streamlit.io> with GitHub.
+2. *Create app* → repo `MassachusettsRealEstateInvestmentAnalysis`, branch `main`, main file `Visualization/dashboard.py`.
+3. Deploy. (No secrets needed. To read from a live database instead, add the `[postgres]` block under *Advanced settings → Secrets*.)
 
 ## Tests
 ```bash
+pip install -r requirements.txt "pyspark==3.5.3"   # needs Java 17
 pytest tests
 ```
+The tests cover the cleaning function and run the three real Glue Spark scripts locally on fixtures (AWS libraries stubbed). Without pyspark/Java the Spark tests are skipped. CI runs everything on every push.
+
+## Report
+The full write-up (architecture, data model, results, limitations) is in [`docs/REPORT.md`](docs/REPORT.md) and [`docs/REPORT.docx`](docs/REPORT.docx).
 
 ## Caveats
 - The RDS security group defaults to `0.0.0.0/0` (password-protected) because Glue jobs run outside a VPC. Restrict `AllowedCidr` or move Glue into the VPC for anything beyond a class project.
 - Metro/county figures are simple averages of city/ZIP series; Zillow doesn't publish every metric for every place. Providence and Vineyard Haven appear because Zillow metros span state lines or islands; only their MA parts are included.
 - Cash flow = rent − mortgage payment only; it ignores taxes, insurance, vacancy and upkeep.
 - Not investment advice.
-- Validation: the full pipeline (CloudFormation → Glue → Step Functions → RDS) has been run successfully in AWS, and the dashboard was verified against the resulting database. The PySpark jobs have no automated tests beyond that end-to-end run.
+- Validation: the full pipeline (CloudFormation → Glue → Step Functions → RDS) was run successfully in AWS and the dashboard verified against the resulting database. The AWS stacks have since been torn down to stop charges; the committed snapshot in `data/demo/` was regenerated with the same loader SQL and matches the AWS output on the headline figures.
